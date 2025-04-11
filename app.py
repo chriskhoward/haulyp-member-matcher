@@ -87,50 +87,46 @@ if wa_file and circle_file:
     if selected_month != 'All':
         filtered_df = filtered_df[filtered_df['Renewal Month'] == selected_month]
     
+    # Convert 'Renewal due' to datetime if it's not already
+    filtered_df['Renewal due'] = pd.to_datetime(filtered_df['Renewal due'], errors='coerce')
+    
+    # Separate members with and without renewal dates
+    members_without_dates = filtered_df[filtered_df['Renewal due'].isna()]
+    members_with_dates = filtered_df[filtered_df['Renewal due'].notna()]
+    
     if len(date_range) == 2:
-        # Convert 'Renewal due' to datetime if it's not already
-        filtered_df['Renewal due'] = pd.to_datetime(filtered_df['Renewal due'], errors='coerce')
-        # Filter out rows with invalid dates
-        filtered_df = filtered_df[filtered_df['Renewal due'].notna()]
-        # Apply date range filter
-        filtered_df = filtered_df[
-            (filtered_df['Renewal due'].dt.date >= date_range[0]) &
-            (filtered_df['Renewal due'].dt.date <= date_range[1])
+        # Apply date range filter only to members with valid dates
+        members_with_dates = members_with_dates[
+            (members_with_dates['Renewal due'].dt.date >= date_range[0]) &
+            (members_with_dates['Renewal due'].dt.date <= date_range[1])
         ]
     
     if 'Active in Circle' in filtered_df.columns and show_active_only:
-        filtered_df = filtered_df[filtered_df['Active in Circle']]
+        members_with_dates = members_with_dates[members_with_dates['Active in Circle']]
+        members_without_dates = members_without_dates[members_without_dates['Active in Circle']]
     
     # Display results
     st.header("Matched Members")
     
-    if not filtered_df.empty:
-        # Generate renewal messages
-        filtered_df['Renewal Message'] = filtered_df.apply(
-            lambda x: f"Hi {x['First name']}, your HAULYP membership is due for renewal on {x['Renewal due'].strftime('%B %d, %Y')}. "
-                     f"Would you like to renew your membership to continue accessing our community and events?",
-            axis=1
-        )
-        
-        # Prepare columns to display
-        display_columns = ['First name', 'Last name', 'Email', 'Renewal due', 'Renewal Message']
-        if 'Active in Circle' in filtered_df.columns:
-            display_columns.append('Active in Circle')
-        
-        # Display the data
-        st.dataframe(
-            filtered_df[display_columns].sort_values('Renewal due'),
-            hide_index=True
-        )
-        
-        # Export functionality
-        st.download_button(
-            label="Download Filtered Data as CSV",
-            data=filtered_df.to_csv(index=False).encode('utf-8'),
-            file_name=f"member_renewals_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.warning("No members match the selected filters.")
+    # Add toggle to show/hide members without renewal dates
+    show_members_without_dates = st.checkbox("Show members without renewal dates", value=True)
+    
+    # Display members with dates
+    st.subheader("Members with Renewal Dates")
+    st.dataframe(members_with_dates)
+    
+    # Display members without dates if toggle is on
+    if show_members_without_dates and not members_without_dates.empty:
+        st.subheader("Members without Renewal Dates")
+        st.dataframe(members_without_dates)
+        st.write(f"Total members without renewal dates: {len(members_without_dates)}")
+    
+    # Export functionality
+    st.download_button(
+        label="Download Filtered Data as CSV",
+        data=filtered_df.to_csv(index=False).encode('utf-8'),
+        file_name=f"member_renewals_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv"
+    )
 else:
     st.info("Please upload both Wild Apricot and Circle.so CSV files to begin.") 
