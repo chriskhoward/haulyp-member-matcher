@@ -88,6 +88,11 @@ if wa_file and circle_file:
         filtered_df = filtered_df[filtered_df['Renewal Month'] == selected_month]
     
     if len(date_range) == 2:
+        # Convert 'Renewal due' to datetime if it's not already
+        filtered_df['Renewal due'] = pd.to_datetime(filtered_df['Renewal due'], errors='coerce')
+        # Filter out rows with invalid dates
+        filtered_df = filtered_df[filtered_df['Renewal due'].notna()]
+        # Apply date range filter
         filtered_df = filtered_df[
             (filtered_df['Renewal due'].dt.date >= date_range[0]) &
             (filtered_df['Renewal due'].dt.date <= date_range[1])
